@@ -1,0 +1,135 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ParkBuddy Heatmap</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #meldingKnop {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 5;
+      padding: 12px 20px;
+      background-color: #3f51b5;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js">
+        function confirmatieMelding(key) {
+            const meldRef = firebase.database().ref("meldingen/" + key + "/confirmaties");
+            meldRef.transaction((currentValue) => {
+                return (currentValue || 0) + 1;
+            });
+        }
+    </script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js">
+        function confirmatieMelding(key) {
+            const meldRef = firebase.database().ref("meldingen/" + key + "/confirmaties");
+            meldRef.transaction((currentValue) => {
+                return (currentValue || 0) + 1;
+            });
+        }
+    </script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAfOkNSl8Wg167g_RiADgW8mmGY78oMHs&libraries=visualization">
+        function confirmatieMelding(key) {
+            const meldRef = firebase.database().ref("meldingen/" + key + "/confirmaties");
+            meldRef.transaction((currentValue) => {
+                return (currentValue || 0) + 1;
+            });
+        }
+    </script>
+</head>
+<body>
+  <div id="map"></div>
+  <button id="meldingKnop">Melding doen</button>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBnkd-1tvBDPC4UysDzyGC6BJ-lQj2bWYY",
+      authDomain: "parkbuddy-ab716.firebaseapp.com",
+      projectId: "parkbuddy-ab716",
+      storageBucket: "parkbuddy-ab716.firebasestorage.app",
+      messagingSenderId: "757948191602",
+      appId: "1:757948191602:web:fe103191635916841343eb"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let map, heatmap, userMarker;
+    const meldingenData = [];
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 52.37, lng: 4.89 },
+        zoom: 13,
+        mapTypeId: 'roadmap'
+      });
+
+      heatmap = new google.maps.visualization.HeatmapLayer({
+        data: meldingenData,
+        radius: 30
+      });
+      heatmap.setMap(map);
+
+      navigator.geolocation.getCurrentPosition((position) => {
+        const userLoc = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        userMarker = new google.maps.Marker({
+          position: userLoc,
+          map: map,
+          title: "Uw locatie"
+        });
+        map.setCenter(userLoc);
+      });
+
+      db.collection("meldingen").onSnapshot(snapshot => {
+        meldingenData.length = 0;
+        const cutoff = Date.now() - 90 * 60 * 1000;
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.timestamp > cutoff) {
+            meldingenData.push(new google.maps.LatLng(data.lat, data.lng));
+          }
+        });
+        heatmap.setData(meldingenData);
+      });
+    }
+
+    document.getElementById("meldingKnop").addEventListener("click", () => {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        db.collection("meldingen").add({
+          lat: lat,
+          lng: lng,
+          timestamp: Date.now(),
+          confirmaties: 0
+        });
+        alert("Melding opgeslagen!");
+      }, () => {
+        alert("Kon locatie niet ophalen.");
+      });
+    });
+
+    window.onload = initMap;
+  
+        function confirmatieMelding(key) {
+            const meldRef = firebase.database().ref("meldingen/" + key + "/confirmaties");
+            meldRef.transaction((currentValue) => {
+                return (currentValue || 0) + 1;
+            });
+        }
+    </script>
+</body>
+</html>
