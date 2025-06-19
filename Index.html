@@ -1,48 +1,50 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <title>ParkBuddy Heatmap</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="initial-scale=1, width=device-width" />
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
     <style>
-      html, body, #map {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            height: 100%;
+        }
     </style>
-  </head>
-  <body>
-    <div id="map"></div>
-
-    <script>
-      let map, heatmap;
-
-      function initMap() {
-        map = new google.maps.Map(document.getElementById("map"), {
-          zoom: 14,
-          center: { lat: 51.9194, lng: 4.4818 }, // Rotterdam centrum
-          mapTypeId: "roadmap",
-        });
-
-        heatmap = new google.maps.visualization.HeatmapLayer({
-          data: getPoints(),
-          map: map,
-        });
-      }
-
-      function getPoints() {
-        return [
-          new google.maps.LatLng(51.9194, 4.4818),
-          new google.maps.LatLng(51.9205, 4.4822),
-          new google.maps.LatLng(51.9189, 4.4800),
-          new google.maps.LatLng(51.9210, 4.4833)
-        ];
-      }
-    </script>
-
     <script async
-      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAfOkNSl8Wg167g_RiADgW8mmGY78oMHs&libraries=visualization&callback=initMap">
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAfOkNSl8Wg167g_RiADgW8mmGY78oMHs&libraries=visualization&callback=initMap">
     </script>
-  </body>
+    <script>
+        let map, heatmap;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 13,
+                center: { lat: 52.3676, lng: 4.9041 }, // Amsterdam
+                mapTypeId: "roadmap"
+            });
+
+            const heatmapData = [
+                new google.maps.LatLng(52.3676, 4.9041),
+                new google.maps.LatLng(52.3690, 4.9030),
+                new google.maps.LatLng(52.3660, 4.9060),
+                new google.maps.LatLng(52.3685, 4.9100)
+            ];
+
+            heatmap = new google.maps.visualization.HeatmapLayer({
+                data: heatmapData,
+                radius: 30
+            });
+            heatmap.setMap(map);
+        }
+
+        window.initMap = initMap;
+    </script>
+</head>
+<body>
+    <div id="map"></div>
+</body>
 </html>
