@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>ParkBuddy Heatmap</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, width=device-width" />
+    <style>
+      html, body, #map {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script>
+      let map, heatmap;
+
+      function initMap() {
+        map = new google.maps.Map(document.getElementById("map"), {
+          zoom: 14,
+          center: { lat: 51.9194, lng: 4.4818 }, // Rotterdam centrum
+          mapTypeId: "roadmap",
+        });
+
+        heatmap = new google.maps.visualization.HeatmapLayer({
+          data: getPoints(),
+          map: map,
+        });
+      }
+
+      function getPoints() {
+        return [
+          new google.maps.LatLng(51.9194, 4.4818),
+          new google.maps.LatLng(51.9205, 4.4822),
+          new google.maps.LatLng(51.9189, 4.4800),
+          new google.maps.LatLng(51.9210, 4.4833)
+        ];
+      }
+    </script>
+
+    <script async
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAfOkNSl8Wg167g_RiADgW8mmGY78oMHs&libraries=visualization&callback=initMap">
+    </script>
+  </body>
+</html>
