@@ -1,0 +1,153 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ParkBuddy Heatmap</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #meldBtn {
+      position: absolute;
+      bottom: 30px;
+      right:  30px;
+      background-color: #28ff98;
+      border: none;
+      border-radius: 50px;
+      padding: 12px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <button id="meldBtn">Melding doen</button>
+
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAfOkNSl8Wg167g_RiADgW8mmGY78oMHs&libraries=visualization"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBnkd-1tvBDPC4UysDzyGC6BJ-lQj2bWYY",
+      authDomain: "parkbuddy-ab716.firebaseapp.com",
+      projectId: "parkbuddy-ab716",
+      storageBucket: "parkbuddy-ab716.appspot.com",
+      messagingSenderId: "757948191602",
+      appId: "1:757948191602:web:fe103191635916841343eb",
+      databaseURL: "https://parkbuddy-ab716-default-rtdb.firebaseio.com/"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let map, heatmap, marker;
+    let lastMeldingTijd = 0;
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 52.3676, lng: 4.9041 },
+        zoom: 13,
+        styles: []
+      });
+
+      marker = new google.maps.Marker({
+        position: map.getCenter(),
+        map,
+        draggable: true,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: "#32e9fa",
+          fillOpacity: 1,
+          strokeWeight: 2,
+          strokeColor: "#ffffff"
+        }
+      });
+
+      heatmap = new google.maps.visualization.HeatmapLayer({
+        data: [],
+        radius: 30
+      });
+      heatmap.setMap(map);
+
+      loadMeldingen();
+
+      document.getElementById("meldBtn").addEventListener("click", () => {
+        const nu = Date.now();
+        if (nu - lastMeldingTijd < 180000) {
+          alert("Je hebt net een melding gedaan. Even wachten voordat je een nieuwe kunt doen.");
+          return;
+        }
+        const pos = marker.getPosition();
+        const newRef = db.ref("meldingen").push();
+        newRef.set({
+          lat: pos.lat(),
+          lng: pos.lng(),
+          timestamp: nu,
+          confirmations: 0
+        }).then(() => {
+          alert("Melding opgeslagen!");
+          lastMeldingTijd = nu;
+        });
+      });
+    }
+
+    function loadMeldingen() {
+      db.ref("meldingen").on("value", (snapshot) => {
+        const meldingen = snapshot.val();
+        const heatData = [];
+        const nu = Date.now();
+
+        for (let key in meldingen) {
+          const melding = meldingen[key];
+          if (nu - melding.timestamp < 90 * 60 * 1000) {
+            heatData.push(new google.maps.LatLng(melding.lat, melding.lng));
+
+            const marker = new google.maps.Marker({
+              position: { lat: melding.lat, lng: melding.lng },
+              map: map,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: "#ff5252",
+                fillOpacity: 0.9,
+                strokeWeight: 1,
+                strokeColor: "#fff"
+              }
+            });
+
+            const infoWindow = new google.maps.InfoWindow({
+              content: `<button onclick="bevestigMelding('${key}')">👍 Bevestigen</button>`
+            });
+
+            marker.addListener("click", () => {
+              infoWindow.open(map, marker);
+            });
+          }
+        }
+
+        heatmap.setData(heatData);
+      });
+    }
+
+    function bevestigMelding(id) {
+      const meldingRef = db.ref("meldingen/" + id + "/confirmations");
+      meldingRef.get().then(snapshot => {
+        const current = snapshot.val() || 0;
+        meldingRef.set(current + 1);
+      });
+    }
+
+    window.initMap = initMap;
+  </script>
+
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAfOkNSl8Wg167g_RiADgW8mmGY78oMHs&callback=initMap&libraries=visualization"></script>
+</body>
+</html>
