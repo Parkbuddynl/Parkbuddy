@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ParkBuddy Live Heatmap</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      html, body, #map {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      .pulse-marker {
+        width: 20px;
+        height: 20px;
+        background: #32e9fa;
+        border-radius: 50%;
+        position: absolute;
+        animation: pulse 2s infinite;
+        z-index: 999;
+      }
+
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(50, 233, 250, 0.4);
+        }
+        70% {
+          box-shadow: 0 0 0 15px rgba(50, 233, 250, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(50, 233, 250, 0);
+        }
+      }
+
+      .button {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+        background-color: #28ff98;
+        color: black;
+        border: none;
+        padding: 10px;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBnkd-1tvBDPC4UysDzyGC6BJ-lQj2bWYY&libraries=visualization"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  </head>
+  <body>
+    <button class="button" onclick="submitMelding()">Melding doen</button>
+    <div id="map"></div>
+
+    <script>
+      const firebaseConfig = {
+  apiKey: "AIzaSyBnkd-1tvBDPC4UysDzyGC6BJ-lQj2bWYY",
+  authDomain: "parkbuddy-ab716.firebaseapp.com",
+  projectId: "parkbuddy-ab716",
+  storageBucket: "parkbuddy-ab716.appspot.com",
+  messagingSenderId: "757948191602",
+  appId: "1:757948191602:web:fe103191635916841343eb"
+};
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      let map, marker, heatmap;
+      let lock = false;
+
+      async function initMap() {
+        const center = { lat: 51.920, lng: 4.484 };
+        map = new google.maps.Map(document.getElementById("map"), {
+          zoom: 13,
+          center: center,
+        });
+
+        marker = new google.maps.Marker({
+          position: center,
+          map: map,
+          draggable: true,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: "#32e9fa",
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: "#0e648c"
+          }
+        });
+
+        loadHeatmap();
+      }
+
+      function submitMelding() {
+        if (lock) {
+          alert("Even wachten voordat je opnieuw meldt.");
+          return;
+        }
+
+        const positie = marker.getPosition();
+        db.collection("meldingen").add({
+          locatie: new firebase.firestore.GeoPoint(positie.lat(), positie.lng()),
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        lock = true;
+        setTimeout(() => lock = false, 180000); // 3 minuten lock
+        alert("Bedankt voor je melding!");
+      }
+
+      async function loadHeatmap() {
+        const now = new Date();
+        const cutoff = new Date(now.getTime() - 90 * 60000); // laatste 90 min
+
+        const snapshot = await db.collection("meldingen")
+          .where("timestamp", ">", cutoff)
+          .get();
+
+        const points = snapshot.docs.map(doc => {
+          const locatie = doc.data().locatie;
+          return new google.maps.LatLng(locatie.latitude, locatie.longitude);
+        });
+
+        heatmap = new google.maps.visualization.HeatmapLayer({
+          data: points,
+          radius: 40,
+          map: map,
+        });
+      }
+
+      window.onload = initMap;
+    </script>
+  </body>
+</html>
