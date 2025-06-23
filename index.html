@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>ParkBuddy Live Heatmap</title>
+    <title>ParkBuddy Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       html, body, #map {
@@ -20,20 +20,24 @@
         background-color: #28ff98;
         color: black;
         border: none;
-        padding: 14px 20px;
+        padding: 14px 24px;
         border-radius: 8px;
         font-weight: bold;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
         cursor: pointer;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+        font-size: 16px;
       }
     </style>
 
-    <!-- MAPS + FIREBASE -->
+    <!-- Google Maps -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBnkd-1tvBDPC4UysDzyGC6BJ-lQj2bWYY&libraries=visualization"></script>
+
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
   </head>
+
   <body>
     <button class="button" onclick="submitMelding()">Melding doen</button>
     <div id="map"></div>
@@ -49,36 +53,34 @@
       };
 
       firebase.initializeApp(firebaseConfig);
-      const db = firebase.firestore();
       const auth = firebase.auth();
+      const db = firebase.firestore();
 
       let map, marker, heatmap;
       let lock = false;
-      let vertraging = 300000; // standaard 5 minuten
-      let currentUserUID = null;
+      let lockDuration = 300000; // standaard 5 min
+      let currentUser = null;
 
-      async function checkPremiumStatus(uid) {
-        const userDoc = await db.collection("Users").doc(uid).get();
-        const isPremium = userDoc.exists && userDoc.data().isPremium === true;
-        vertraging = isPremium ? 120000 : 300000; // 2 min of 5 min
-      }
-
-      auth.onAuthStateChanged(async (user) => {
+      auth.onAuthStateChanged(async user => {
         if (user) {
-          currentUserUID = user.uid;
-          await checkPremiumStatus(currentUserUID);
-          initMap();
+          currentUser = user;
+          const doc = await db.collection("Users").doc(user.uid).get();
+          if (doc.exists && doc.data().isPremium) {
+            lockDuration = 60000; // 1 minuut voor premium
+            console.log("Premium gebruiker gedetecteerd");
+          } else {
+            console.log("Standaard gebruiker");
+          }
         } else {
-          // Automatisch inloggen testaccount (alleen tijdelijk)
-          auth.signInWithEmailAndPassword("test@test.com", "test1234").catch(console.error);
+          alert("Je bent niet ingelogd.");
         }
       });
 
-      function initMap() {
+      async function initMap() {
         const center = { lat: 51.920, lng: 4.484 };
         map = new google.maps.Map(document.getElementById("map"), {
           zoom: 13,
-          center: center
+          center: center,
         });
 
         marker = new google.maps.Marker({
@@ -95,29 +97,44 @@
           }
         });
 
+        marker.addListener('dragend', () => {
+          map.panTo(marker.getPosition());
+        });
+
         loadHeatmap();
+        setInterval(loadHeatmap, 60000); // elke 60 sec verversen
       }
 
-      function submitMelding() {
+      async function submitMelding() {
+        if (!currentUser) {
+          alert("Je moet ingelogd zijn om een melding te doen.");
+          return;
+        }
+
         if (lock) {
           alert("Even wachten voordat je opnieuw meldt.");
           return;
         }
 
         const positie = marker.getPosition();
-        db.collection("meldingen").add({
-          locatie: new firebase.firestore.GeoPoint(positie.lat(), positie.lng()),
-          timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        try {
+          await db.collection("meldingen").add({
+            locatie: new firebase.firestore.GeoPoint(positie.lat(), positie.lng()),
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
 
-        lock = true;
-        setTimeout(() => lock = false, vertraging);
-        alert("Bedankt voor je melding!");
+          lock = true;
+          setTimeout(() => lock = false, lockDuration);
+          alert("Bedankt voor je melding!");
+        } catch (e) {
+          console.error("Fout bij melden:", e);
+          alert("Er ging iets mis bij het versturen van je melding.");
+        }
       }
 
       async function loadHeatmap() {
         const now = new Date();
-        const cutoff = new Date(now.getTime() - 90 * 60000); // 90 minuten
+        const cutoff = new Date(now.getTime() - 90 * 60000); // laatste 90 minuten
 
         const snapshot = await db.collection("meldingen")
           .where("timestamp", ">", cutoff)
@@ -128,12 +145,18 @@
           return new google.maps.LatLng(locatie.latitude, locatie.longitude);
         });
 
+        if (heatmap) {
+          heatmap.setMap(null); // oude verwijderen
+        }
+
         heatmap = new google.maps.visualization.HeatmapLayer({
           data: points,
           radius: 40,
           map: map,
         });
       }
+
+      window.onload = initMap;
     </script>
   </body>
 </html>
