@@ -64,15 +64,19 @@
       auth.onAuthStateChanged(async user => {
         if (user) {
           currentUser = user;
-          const doc = await db.collection("Users").doc(user.uid).get();
-          if (doc.exists && doc.data().isPremium) {
-            lockDuration = 60000; // 1 minuut voor premium
-            console.log("Premium gebruiker gedetecteerd");
-          } else {
-            console.log("Standaard gebruiker");
+          try {
+            const doc = await db.collection("Users").doc(user.uid).get();
+            if (doc.exists && doc.data().isPremium) {
+              lockDuration = 60000; // 1 minuut voor premium
+              console.log("Premium gebruiker gedetecteerd");
+            } else {
+              console.log("Ingelogd, geen premium");
+            }
+          } catch (e) {
+            console.warn("Kon premiumstatus niet ophalen", e);
           }
         } else {
-          alert("Je bent niet ingelogd.");
+          console.log("Geen gebruiker ingelogd – standaard vertraging");
         }
       });
 
@@ -106,11 +110,6 @@
       }
 
       async function submitMelding() {
-        if (!currentUser) {
-          alert("Je moet ingelogd zijn om een melding te doen.");
-          return;
-        }
-
         if (lock) {
           alert("Even wachten voordat je opnieuw meldt.");
           return;
@@ -120,7 +119,8 @@
         try {
           await db.collection("meldingen").add({
             locatie: new firebase.firestore.GeoPoint(positie.lat(), positie.lng()),
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            gebruiker: currentUser ? currentUser.uid : null
           });
 
           lock = true;
@@ -146,7 +146,7 @@
         });
 
         if (heatmap) {
-          heatmap.setMap(null); // oude verwijderen
+          heatmap.setMap(null);
         }
 
         heatmap = new google.maps.visualization.HeatmapLayer({
