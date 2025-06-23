@@ -45,10 +45,33 @@
           0 2px 0 #1ed17a,
           0 4px 8px rgba(0, 0, 0, 0.2);
       }
+
+      .center-button {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        background-color: white;
+        color: #333;
+        border: 2px solid #28ff98;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-family: 'Poppins', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        transition: all 0.2s ease-in-out;
+      }
+
+      .center-button:hover {
+        background-color: #28ff98;
+        color: white;
+      }
     </style>
 
     <!-- Google Maps -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBnkd-1tvBDPC4UysDzyGC6BJ-lQj2bWYY&libraries=visualization"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBnkd-1tvBDPC4UysDzyGC6BJ-lQj2bWYY&libraries=visualization,places"></script>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
@@ -58,6 +81,7 @@
 
   <body>
     <button class="button" onclick="submitMelding()">Melding doen</button>
+    <button class="center-button" onclick="centerOnUser()">📍 Mijn Locatie</button>
     <div id="map"></div>
 
     <script>
@@ -99,7 +123,21 @@
       });
 
       async function initMap() {
-        const center = { lat: 51.920, lng: 4.484 };
+        const fallback = { lat: 51.920, lng: 4.484 };
+
+        navigator.geolocation.getCurrentPosition((position) => {
+          const currentPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+
+          startMap(currentPos);
+        }, () => {
+          startMap(fallback); // fallback naar Rotterdam
+        });
+      }
+
+      function startMap(center) {
         map = new google.maps.Map(document.getElementById("map"), {
           zoom: 13,
           center: center,
@@ -127,27 +165,55 @@
         setInterval(loadHeatmap, 60000); // elke 60 sec verversen
       }
 
-      async function submitMelding() {
+      function centerOnUser() {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition((position) => {
+            const userLocation = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            map.panTo(userLocation);
+            marker.setPosition(userLocation);
+          }, () => {
+            alert("Locatie ophalen mislukt.");
+          });
+        } else {
+          alert("Geolocatie wordt niet ondersteund door deze browser.");
+        }
+      }
+
+      function submitMelding() {
         if (lock) {
           alert("Even wachten voordat je opnieuw meldt.");
           return;
         }
 
         const positie = marker.getPosition();
-        try {
-          await db.collection("meldingen").add({
-            locatie: new firebase.firestore.GeoPoint(positie.lat(), positie.lng()),
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            gebruiker: currentUser ? currentUser.uid : null
-          });
+        const geocoder = new google.maps.Geocoder();
 
-          lock = true;
-          setTimeout(() => lock = false, lockDuration);
-          alert("Bedankt voor je melding!");
-        } catch (e) {
-          console.error("Fout bij melden:", e);
-          alert("Er ging iets mis bij het versturen van je melding.");
-        }
+        geocoder.geocode({ location: positie }, async (results, status) => {
+          if (status === "OK" && results[0]) {
+            const plaats = results[0].address_components.find(c => c.types.includes("locality"))?.long_name || "Onbekend";
+
+            try {
+              await db.collection("meldingen").add({
+                locatie: new firebase.firestore.GeoPoint(positie.lat(), positie.lng()),
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                gebruiker: currentUser ? currentUser.uid : null,
+                plaats: plaats
+              });
+
+              lock = true;
+              setTimeout(() => lock = false, lockDuration);
+              alert("Bedankt voor je melding uit " + plaats + "!");
+            } catch (e) {
+              console.error("Fout bij melden:", e);
+              alert("Er ging iets mis bij het versturen van je melding.");
+            }
+          } else {
+            alert("Kon geen plaatsnaam ophalen.");
+          }
+        });
       }
 
       async function loadHeatmap() {
