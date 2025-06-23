@@ -29,6 +29,7 @@
         cursor: pointer;
         font-size: 16px;
         box-shadow: 0 6px 0 #1ed17a, 0 4px 15px rgba(0, 0, 0, 0.2);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
         transition: all 0.15s ease-in-out;
       }
 
@@ -72,7 +73,7 @@
 
       let map, marker, heatmap;
       let lock = false;
-      let lockDuration = 300000;
+      let lockDuration = 300000; // standaard 5 min
       let currentUser = null;
 
       auth.onAuthStateChanged(async user => {
@@ -81,7 +82,7 @@
           try {
             const doc = await db.collection("Users").doc(user.uid).get();
             if (doc.exists && doc.data().isPremium) {
-              lockDuration = 60000;
+              lockDuration = 60000; // 1 minuut voor premium
               console.log("Premium gebruiker gedetecteerd");
             } else {
               console.log("Ingelogd, geen premium");
@@ -120,7 +121,7 @@
         });
 
         loadHeatmap();
-        setInterval(loadHeatmap, 60000);
+        setInterval(loadHeatmap, 60000); // elke 60 sec verversen
       }
 
       async function submitMelding() {
@@ -148,7 +149,7 @@
 
       async function loadHeatmap() {
         const now = new Date();
-        const cutoff = new Date(now.getTime() - 90 * 60000);
+        const cutoff = new Date(now.getTime() - 90 * 60000); // laatste 90 minuten
 
         const snapshot = await db.collection("meldingen")
           .where("timestamp", ">", cutoff)
